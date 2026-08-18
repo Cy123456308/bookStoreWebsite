@@ -28,6 +28,16 @@ def get_categories():
     return jsonify([{"id": c.id, "name": c.name} for c in Category.query.all()])
 
 
+@bp.route("/categories/usage", methods=["GET"])
+def get_categories_usage():
+    categories = Category.query.order_by(Category.name.asc()).all()
+    result = []
+    for c in categories:
+        count = Book.query.filter_by(category=c.id).count()
+        result.append({"id": c.id, "name": c.name, "bookCount": count})
+    return jsonify(result)
+
+
 @bp.route("/books", methods=["GET"])
 def get_books():
     items = Book.query

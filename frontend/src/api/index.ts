@@ -94,6 +94,10 @@ export function fetchCategories(): Promise<Category[]> {
   return getJSON<Category[]>(`${API_BASE}/categories`)
 }
 
+export function fetchCategoryUsage(): Promise<Array<{ id: string; name: string; bookCount: number }>> {
+  return getJSON<Array<{ id: string; name: string; bookCount: number }>>(`${API_BASE}/categories/usage`)
+}
+
 export function fetchBooks(params?: BookQuery): Promise<Paginated<Book>> {
   const qs = new URLSearchParams()
   if (params?.category) qs.set('category', params.category)
@@ -277,6 +281,9 @@ export function updateSite(data: Partial<SiteInfo>): Promise<SiteInfo> {
 
 export function adminFetchNav(): Promise<NavItem[]> {
   return sendJSON<NavItem[]>('GET', '/admin/nav')
+}
+export function adminFetchCategoryUsage(): Promise<Array<{ id: string; name: string; bookCount: number }>> {
+  return sendJSON<Array<{ id: string; name: string; bookCount: number }>>('GET', '/admin/categories/usage')
 }
 export function createNavItem(data: Partial<NavItem>): Promise<NavItem> {
   return sendJSON<NavItem>('POST', '/admin/nav', data)

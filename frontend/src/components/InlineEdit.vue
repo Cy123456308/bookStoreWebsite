@@ -36,6 +36,7 @@ watch(
 
 function onBlur() {
   if (localValue.value !== props.modelValue) {
+    emit('update:modelValue', localValue.value)
     emit('save', localValue.value)
   }
 }

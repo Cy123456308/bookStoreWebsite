@@ -61,11 +61,24 @@ async function saveField(field: string, value: string | number | boolean) {
     book.value = { ...book.value, ...updated }
     saveMsg.value = '保存しました'
     setTimeout(() => (saveMsg.value = ''), 2000)
-  } catch {
-    saveMsg.value = '保存に失敗しました'
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown error'
+    if (msg.includes('unauthorized')) {
+      auth.logout()
+      saveMsg.value = 'ログイン期限切れです。再ログインしてください。'
+    } else {
+      saveMsg.value = `保存に失敗しました: ${msg}`
+    }
+    // Re-sync detail so UI matches the persisted backend state.
+    await load(bookId.value)
   } finally {
     saving.value = false
   }
+}
+
+async function saveCategory(categoryId: string) {
+  if (!book.value || !categoryId || categoryId === book.value.category) return
+  await saveField('category', categoryId)
 }
 
 async function onCoverChange(file: File) {
@@ -78,8 +91,15 @@ async function onCoverChange(file: File) {
     book.value = { ...book.value, ...updated }
     saveMsg.value = '表紙を更新しました'
     setTimeout(() => (saveMsg.value = ''), 2000)
-  } catch {
-    saveMsg.value = 'アップロードに失敗しました'
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown error'
+    if (msg.includes('unauthorized')) {
+      auth.logout()
+      saveMsg.value = 'ログイン期限切れです。再ログインしてください。'
+    } else {
+      saveMsg.value = `アップロードに失敗しました: ${msg}`
+    }
+    await load(bookId.value)
   } finally {
     saving.value = false
   }
@@ -181,7 +201,26 @@ watch(
             </div>
             <div class="book-detail__meta-row">
               <dt>カテゴリ</dt>
-              <dd>{{ categoryName }}</dd>
+              <dd>
+                <template v-if="auth.editing">
+                  <select
+                    class="book-detail__category-select"
+                    :value="book.category"
+                    @change="(e) => saveCategory((e.target as HTMLSelectElement).value)"
+                  >
+                    <option
+                      v-for="cat in books.categories"
+                      :key="cat.id"
+                      :value="cat.id"
+                    >
+                      {{ cat.name }}
+                    </option>
+                  </select>
+                </template>
+                <template v-else>
+                  {{ categoryName }}
+                </template>
+              </dd>
             </div>
           </dl>
 
@@ -368,6 +407,15 @@ watch(
   margin: 0;
   font-size: 13px;
   color: #333;
+}
+
+.book-detail__category-select {
+  min-width: 180px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #fff;
+  font-size: 13px;
 }
 
 .book-detail__desc {

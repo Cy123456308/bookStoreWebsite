@@ -7,6 +7,7 @@ from .nav import NavItem
 from .download import Download
 from .site import SiteSetting
 from .admin_user import AdminUser
+from .admin_token import AdminToken
 
 __all__ = [
     "Category",
@@ -17,4 +18,5 @@ __all__ = [
     "Download",
     "SiteSetting",
     "AdminUser",
+    "AdminToken",
 ]

@@ -98,6 +98,7 @@ def site_to_dict(s: SiteSetting) -> dict:
         "name": s.name,
         "intro": s.intro,
         "twitterUrl": s.twitterUrl,
+        "twitterText": s.twitterText,
         "email": s.email,
         "address": s.address,
         "phone": s.phone,
@@ -106,6 +107,9 @@ def site_to_dict(s: SiteSetting) -> dict:
         "clients": _loads(s.clients, []),
         "homeSections": _loads(s.homeSections, []),
         "logoUrl": s.logoUrl,
+        "businessLead": s.businessLead,
+        "businessIntro": s.businessIntro,
+        "businessNote": s.businessNote,
     }
 
 

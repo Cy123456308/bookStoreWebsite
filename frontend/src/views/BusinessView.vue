@@ -4,6 +4,7 @@ import BookRow from '@/components/BookRow.vue'
 import { useBooksStore } from '@/stores/books'
 import { useAuthStore } from '@/stores/auth'
 import { useSiteStore } from '@/stores/site'
+import { updateSite } from '@/api'
 import InlineEdit from '@/components/InlineEdit.vue'
 
 const books = useBooksStore()
@@ -21,6 +22,23 @@ const displayBooks = computed(() => {
 
 function toggleShowAll() {
   showAllBooks.value = !showAllBooks.value
+}
+
+async function saveField(field: 'businessLead' | 'businessIntro' | 'businessNote', value: string) {
+  if (!site.info) return
+  saving.value = true
+  saveMsg.value = ''
+  try {
+    const updated = await updateSite({ [field]: value })
+    site.info = { ...site.info, ...updated }
+    saveMsg.value = '保存しました'
+    setTimeout(() => (saveMsg.value = ''), 2000)
+  } catch (e) {
+    console.error(e)
+    saveMsg.value = '保存に失敗しました'
+  } finally {
+    saving.value = false
+  }
 }
 
 async function saveServices() {
@@ -95,10 +113,11 @@ onMounted(async () => {
       <h1 class="business__title">業務紹介</h1>
       <p class="business__lead">
         <InlineEdit
-          :model-value="'近年、日本の作品は中国で注目を集めています。小社は、これからの実績とネットワークを生かし、日本で生まれた作品を中国へご紹介しています。著作権の仲介業務および関連のコンサルタント業務をご提供いたします。'"
+          :model-value="site.info?.businessLead || '近年、日本の作品は中国で注目を集めています。小社は、これからの実績とネットワークを生かし、日本で生まれた作品を中国へご紹介しています。著作権の仲介業務および関連のコンサルタント業務をご提供いたします。'"
           :editing="auth.editing"
           tag="textarea"
           placeholder="リード文"
+          @save="(v) => saveField('businessLead', v)"
         />
       </p>
     </header>
@@ -125,10 +144,11 @@ onMounted(async () => {
       </div>
       <p class="business__block-intro">
         <InlineEdit
-          :model-value="'小社は、日本の作品の翻訳出版契約締結までのエージェント業務を迅速かつ安心できる著作権の仲介業務および関連のコンサルタント業務をご提供致しております。'"
+          :model-value="site.info?.businessIntro || '小社は、日本の作品の翻訳出版契約締結までのエージェント業務を迅速かつ安心できる著作権の仲介業務および関連のコンサルタント業務をご提供致しております。'"
           :editing="auth.editing"
           tag="textarea"
           placeholder="事業内容紹介"
+          @save="(v) => saveField('businessIntro', v)"
         />
       </p>
       <ul class="business__services">
@@ -143,9 +163,9 @@ onMounted(async () => {
       </ul>
       <p class="business__block-note">
         <InlineEdit
-          :model-value="'また、日本と中国の出版社間の相互交流を深める目的で関連の文化交流活動の計画と推進を行っております。お気軽にお問い合わせください。'"
+          :model-value="site.info?.businessNote || 'また、日本と中国の出版社間の相互交流を深める目的で関連の文化交流活動の計画と推進を行っております。お気軽にお問い合わせください。'"
           :editing="auth.editing"
-          @save="() => {}"
+          @save="(v) => saveField('businessNote', v)"
         />
       </p>
       <div v-if="auth.editing" class="business__save-actions">

@@ -46,6 +46,10 @@ def init_db():
     _add_column_if_missing("site_setting", "clients", "TEXT DEFAULT '[]'", "[]")
     _add_column_if_missing("site_setting", "homeSections", "TEXT DEFAULT '[]'", "[]")
     _add_column_if_missing("site_setting", "logoUrl", "VARCHAR(500) DEFAULT ''")
+    _add_column_if_missing("site_setting", "twitterText", "VARCHAR(500) DEFAULT ''", "")
+    _add_column_if_missing("site_setting", "businessLead", "TEXT DEFAULT ''", "")
+    _add_column_if_missing("site_setting", "businessIntro", "TEXT DEFAULT ''", "")
+    _add_column_if_missing("site_setting", "businessNote", "TEXT DEFAULT ''", "")
 
     if Category.query.count() == 0:
         for c in [
@@ -135,6 +139,7 @@ def init_db():
             name="株式会社ヒロガワ（宏河書房）",
             intro="宏河書房は「株式会社ヒロガワ」の出版部。中国の文芸・歴史・思想・哲学・文化・民俗などを中心に出版活動を行っています。",
             twitterUrl="https://x.com/Hirogawa_Books",
+            twitterText="X ツイッターを利用しています。",
             email="info@hirogawa.com",
             address="（占位）東京都…",
             phone="（占位）03-0000-0000",
@@ -184,6 +189,9 @@ def init_db():
             homeSections=_dumps([
                 {"id": "sec_new", "title": "新刊紹介", "bookId": "4908989273"},
             ]),
+            businessLead="近年、日本の作品は中国で注目を集めています。小社は、これからの実績とネットワークを生かし、日本で生まれた作品を中国へご紹介しています。著作権の仲介業務および関連のコンサルタント業務をご提供いたします。",
+            businessIntro="小社は、日本の作品の翻訳出版契約締結までのエージェント業務を迅速かつ安心できる著作権の仲介業務および関連のコンサルタント業務をご提供致しております。",
+            businessNote="また、日本と中国の出版社間の相互交流を深める目的で関連の文化交流活動の計画と推進を行っております。お気軽にお問い合わせください。",
         ))
 
     if AdminUser.query.count() == 0:

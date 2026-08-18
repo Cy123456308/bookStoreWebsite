@@ -72,6 +72,7 @@ export interface SiteInfo {
   name: string
   intro: string
   twitterUrl?: string
+  twitterText?: string
   email?: string
   address?: string
   phone?: string
@@ -80,6 +81,9 @@ export interface SiteInfo {
   clients: string[]
   homeSections: HomeSection[]
   logoUrl?: string
+  businessLead?: string
+  businessIntro?: string
+  businessNote?: string
 }
 
 export interface ContactPayload {

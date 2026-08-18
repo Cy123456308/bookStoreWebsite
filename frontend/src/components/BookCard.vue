@@ -13,7 +13,11 @@ const auth = useAuthStore()
 
 <template>
   <article class="book-card" :class="{ 'book-card--editing': auth.editing }">
-    <RouterLink class="book-card__link" :to="auth.editing ? '#' : `/book/${book.id}`">
+    <component
+      :is="auth.editing ? 'div' : 'RouterLink'"
+      class="book-card__link"
+      v-bind="auth.editing ? {} : { to: `/book/${book.id}` }"
+    >
       <div class="book-card__cover">
         <img v-if="book.cover" :src="book.cover" :alt="book.title" />
         <span v-else>封面占位</span>
@@ -42,7 +46,7 @@ const auth = useAuthStore()
           @save="(v) => onSave?.(book, 'price', Number(v) || 0)"
         />
       </p>
-    </RouterLink>
+    </component>
   </article>
 </template>
 

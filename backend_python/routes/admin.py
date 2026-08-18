@@ -8,10 +8,10 @@ from werkzeug.security import check_password_hash
 import secrets
 
 from extensions import db
-from auth import ACTIVE_TOKENS, require_admin
+from auth import require_admin
 from models import (
     Book, Article, Category, Banner, NavItem, Download,
-    SiteSetting, AdminUser,
+    SiteSetting, AdminUser, AdminToken,
 )
 from helpers import (
     book_to_dict, article_to_dict, banner_to_dict,
@@ -45,7 +45,8 @@ def admin_login():
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "invalid credentials"}), 401
     token = secrets.token_hex(32)
-    ACTIVE_TOKENS.add(token)
+    db.session.add(AdminToken(token=token, admin_user_id=user.id))
+    db.session.commit()
     return jsonify({"token": token})
 
 
@@ -54,7 +55,9 @@ def admin_login():
 def admin_logout():
     auth = request.headers.get("Authorization", "")
     token = auth.replace("Bearer ", "").strip()
-    ACTIVE_TOKENS.discard(token)
+    if token:
+        AdminToken.query.filter_by(token=token).delete()
+        db.session.commit()
     return jsonify({"ok": True})
 
 
@@ -179,6 +182,7 @@ def _apply_site(data, s):
     s.name = data.get("name", s.name)
     s.intro = data.get("intro", s.intro)
     s.twitterUrl = data.get("twitterUrl", s.twitterUrl)
+    s.twitterText = data.get("twitterText", s.twitterText)
     s.email = data.get("email", s.email)
     s.address = data.get("address", s.address)
     s.phone = data.get("phone", s.phone)
@@ -192,6 +196,9 @@ def _apply_site(data, s):
         s.homeSections = _dumps(data["homeSections"] or [])
     if "logoUrl" in data:
         s.logoUrl = data.get("logoUrl", s.logoUrl)
+    s.businessLead = data.get("businessLead", s.businessLead)
+    s.businessIntro = data.get("businessIntro", s.businessIntro)
+    s.businessNote = data.get("businessNote", s.businessNote)
 
 
 # --------------------------------------------------------------------------
@@ -334,6 +341,17 @@ def delete_article(article_id):
 # --------------------------------------------------------------------------
 # Categories
 # --------------------------------------------------------------------------
+@bp.route("/admin/categories/usage", methods=["GET"])
+@require_admin
+def admin_category_usage():
+    categories = Category.query.order_by(Category.name.asc()).all()
+    result = []
+    for c in categories:
+        count = Book.query.filter_by(category=c.id).count()
+        result.append({"id": c.id, "name": c.name, "bookCount": count})
+    return jsonify(result)
+
+
 @bp.route("/categories", methods=["POST"])
 @require_admin
 def create_category():
@@ -363,6 +381,9 @@ def delete_category(cat_id):
     c = Category.query.get(cat_id)
     if c is None:
         return jsonify({"error": "not found"}), 404
+    count = Book.query.filter_by(category=cat_id).count()
+    if count > 0:
+        return jsonify({"error": "category has books"}), 409
     db.session.delete(c)
     db.session.commit()
     return jsonify({"ok": True})

@@ -1,5 +1,8 @@
 # Sakura + Render 部署指南（前后端分离）
 
+如果你准备把后端迁移到 PHP（Laravel），请参考：
+- [BACKEND_PHP_MIGRATION_GUIDE.md](BACKEND_PHP_MIGRATION_GUIDE.md)
+
 本项目建议部署方式：
 - 前端（Vue/Vite）部署到 Sakura（静态站点）
 - 后端（Flask）部署到 Render（Web Service）

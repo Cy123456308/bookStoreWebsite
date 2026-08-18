@@ -65,10 +65,10 @@ async function saveField(field: string, value: string) {
           <span class="site-header__twitter-icon">X</span>
           <span class="site-header__twitter-text">
             <InlineEdit
-              :model-value="'X ツイッターを利用しています。'"
+              :model-value="site.info?.twitterText || 'X ツイッターを利用しています。'"
               :editing="auth.editing"
               placeholder="X 文案"
-              @save="(v) => saveField('twitterUrl', v)"
+              @save="(v) => saveField('twitterText', v)"
             />
           </span>
         </a>

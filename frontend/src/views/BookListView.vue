@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import BookCard from '@/components/BookCard.vue'
 import { useBooksStore } from '@/stores/books'
 import { useAuthStore } from '@/stores/auth'
-import { updateBook, createBook, deleteBook } from '@/api'
+import { updateBook, createBook, deleteBook, createCategory, deleteCategory, fetchCategoryUsage, uploadImage } from '@/api'
 import type { Book } from '@/types'
 
 const books = useBooksStore()
@@ -15,8 +15,20 @@ const query = ref('')
 const searchInput = ref('')
 const page = ref(1)
 const savingId = ref('')
+const newCategoryName = ref('')
+const categoryUsage = ref<Array<{ id: string; name: string; bookCount: number }>>([])
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function handleAdminError(e: unknown, fallback: string) {
+  const msg = e instanceof Error ? e.message : 'unknown error'
+  if (msg.includes('unauthorized')) {
+    auth.logout()
+    alert('ログイン期限切れです。再ログインしてください。')
+    return
+  }
+  alert(`${fallback}: ${msg}`)
+}
 
 async function load(resetPage = true) {
   if (resetPage) page.value = 1
@@ -55,6 +67,15 @@ function changePage(p: number) {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(books.total / PAGE_SIZE)))
 
+const categoryManageItems = computed(() => {
+  const usageMap = new Map(categoryUsage.value.map((c) => [c.id, c.bookCount]))
+  return books.categories.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    bookCount: usageMap.get(cat.id) ?? 0,
+  }))
+})
+
 const pageItems = computed<(number | '...')[]>(() => {
   const tp = totalPages.value
   if (tp <= 7) return Array.from({ length: tp }, (_, i) => i + 1)
@@ -78,8 +99,24 @@ async function saveBookField(book: Book, field: string, value: string | number) 
     if (idx !== -1) {
       books.books[idx] = { ...books.books[idx], ...updated }
     }
-  } catch {
-    // Could show error
+  } catch (e) {
+    handleAdminError(e, '保存に失敗しました')
+  } finally {
+    savingId.value = ''
+  }
+}
+
+async function updateBookCover(book: Book, file: File) {
+  savingId.value = book.id
+  try {
+    const upload = await uploadImage(file)
+    const updated = await updateBook(book.id, { cover: upload.url })
+    const idx = books.books.findIndex((b) => b.id === book.id)
+    if (idx !== -1) {
+      books.books[idx] = { ...books.books[idx], ...updated }
+    }
+  } catch (e) {
+    handleAdminError(e, '画像更新に失敗しました')
   } finally {
     savingId.value = ''
   }
@@ -99,7 +136,7 @@ async function addBook() {
     books.books.unshift(newBook)
   } catch (e) {
     console.error('addBook failed:', e)
-    alert('書籍の追加に失敗しました: ' + (e instanceof Error ? e.message : ''))
+    handleAdminError(e, '書籍の追加に失敗しました')
   } finally {
     savingId.value = ''
   }
@@ -112,7 +149,7 @@ async function removeBook(book: Book) {
     books.books = books.books.filter((b) => b.id !== book.id)
   } catch (e) {
     console.error('removeBook failed:', e)
-    alert('書籍の削除に失敗しました: ' + (e instanceof Error ? e.message : ''))
+    handleAdminError(e, '書籍の削除に失敗しました')
   } finally {
     savingId.value = ''
   }
@@ -128,6 +165,7 @@ async function toggleFeatured(book: Book) {
     }
   } catch (e) {
     console.error('toggleFeatured failed:', e)
+    handleAdminError(e, '特集設定の更新に失敗しました')
   } finally {
     savingId.value = ''
   }
@@ -153,15 +191,68 @@ async function moveBook(book: Book, direction: 'up' | 'down') {
     books.books.splice(targetIdx, 0, books.books.splice(idx, 1)[0])
   } catch (e) {
     console.error('moveBook failed:', e)
+    handleAdminError(e, '並び替えに失敗しました')
   } finally {
     savingId.value = ''
+  }
+}
+
+async function loadCategoryUsage() {
+  try {
+    categoryUsage.value = await fetchCategoryUsage()
+  } catch (e) {
+    console.error('loadCategoryUsage failed:', e)
+  }
+}
+
+async function addCategory() {
+  const name = newCategoryName.value.trim()
+  if (!name) return
+  try {
+    await createCategory({ name })
+    newCategoryName.value = ''
+    books.categories = []
+    await books.loadCategories()
+    await loadCategoryUsage()
+  } catch (e) {
+    handleAdminError(e, 'カテゴリ追加に失敗しました')
+  }
+}
+
+async function removeCategory(catId: string, catName: string, bookCount: number) {
+  if (bookCount > 0) {
+    alert('このカテゴリには書籍があるため削除できません。')
+    return
+  }
+  if (!confirm(`カテゴリ「${catName}」を削除しますか？`)) return
+  try {
+    await deleteCategory(catId)
+    if (activeCategory.value === catId) {
+      activeCategory.value = ''
+    }
+    books.categories = []
+    await books.loadCategories()
+    await loadCategoryUsage()
+    await load(false)
+  } catch (e) {
+    handleAdminError(e, 'カテゴリ削除に失敗しました')
   }
 }
 
 onMounted(async () => {
   await books.loadCategories()
   await load()
+  await loadCategoryUsage()
 })
+
+watch(
+  () => [auth.isLoggedIn, auth.editing] as const,
+  async ([loggedIn, editing]) => {
+    if (loggedIn && editing) {
+      await loadCategoryUsage()
+    }
+  },
+)
 </script>
 
 <template>
@@ -216,6 +307,35 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div v-if="auth.editing" class="book-list__category-admin">
+      <h3 class="book-list__category-admin-title">カテゴリ管理</h3>
+      <div class="book-list__category-create">
+        <input
+          v-model="newCategoryName"
+          type="text"
+          class="book-list__category-input"
+          placeholder="新しいカテゴリ名"
+          @keydown.enter.prevent="addCategory"
+        />
+        <button type="button" class="book-list__category-add-btn" @click="addCategory">追加</button>
+      </div>
+      <ul class="book-list__category-list">
+        <li v-for="cat in categoryManageItems" :key="cat.id" class="book-list__category-item">
+          <span class="book-list__category-name">{{ cat.name }}</span>
+          <span class="book-list__category-count">{{ cat.bookCount }} 冊</span>
+          <button
+            type="button"
+            class="book-list__category-del-btn"
+            :disabled="cat.bookCount > 0"
+            @click="removeCategory(cat.id, cat.name, cat.bookCount)"
+          >
+            削除
+          </button>
+        </li>
+      </ul>
+      <p class="book-list__category-hint">書籍が 0 冊のカテゴリのみ削除できます。</p>
+    </div>
+
     <div v-if="books.books.length" class="book-list__grid">
       <div v-for="(book, idx) in books.books" :key="book.id" class="book-list__card-wrap">
         <BookCard
@@ -223,6 +343,18 @@ onMounted(async () => {
           :on-save="auth.editing ? saveBookField : undefined"
         />
         <div v-if="auth.editing" class="book-list__card-admin">
+          <label class="book-list__cover-btn" title="画像変更">
+            <input
+              type="file"
+              accept="image/*"
+              @change="(e) => {
+                const t = e.target as HTMLInputElement
+                if (t.files?.[0]) updateBookCover(book, t.files[0])
+                t.value = ''
+              }"
+            />
+            画像
+          </label>
           <button
             type="button"
             class="book-list__feat-btn"
@@ -411,6 +543,110 @@ onMounted(async () => {
   gap: 4px;
   margin-top: 6px;
   justify-content: center;
+}
+
+.book-list__cover-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid #bbb;
+  background: #fff;
+  color: #333;
+  font-size: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.book-list__cover-btn:hover {
+  border-color: #004b98;
+  color: #004b98;
+}
+
+.book-list__cover-btn input {
+  display: none;
+}
+
+.book-list__category-admin {
+  border: 1px solid #e5e5e5;
+  background: #fafafa;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.book-list__category-admin-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.book-list__category-create {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.book-list__category-input {
+  width: 260px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.book-list__category-add-btn {
+  padding: 6px 12px;
+  border: none;
+  background: #004b98;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.book-list__category-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.book-list__category-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid #eee;
+}
+
+.book-list__category-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-list__category-count {
+  font-size: 12px;
+  color: #666;
+}
+
+.book-list__category-del-btn {
+  padding: 4px 10px;
+  border: 1px solid #d66;
+  color: #d22;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.book-list__category-del-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.book-list__category-hint {
+  margin: 8px 0 0;
+  color: #666;
+  font-size: 12px;
 }
 
 .book-list__feat-btn {
