@@ -1,0 +1,10 @@
+RewriteEngine On
+RewriteBase /
+
+# 让已存在的文件/目录正常访问
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Vue Router history fallback
+RewriteRule . /index.html [L]
